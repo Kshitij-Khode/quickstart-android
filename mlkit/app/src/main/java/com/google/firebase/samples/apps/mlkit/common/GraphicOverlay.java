@@ -16,6 +16,7 @@ package com.google.firebase.samples.apps.mlkit.common;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import com.google.android.gms.vision.CameraSource;
@@ -153,6 +154,9 @@ public class GraphicOverlay extends View {
     synchronized (lock) {
       this.previewWidth = previewWidth;
       this.previewHeight = previewHeight;
+
+      Log.e("KBK", "previewWidth: " + previewWidth + ", previewHeight: " + previewHeight);
+
       this.facing = facing;
     }
     postInvalidate();

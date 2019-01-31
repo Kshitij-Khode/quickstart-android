@@ -14,6 +14,7 @@
 package com.google.firebase.samples.apps.mlkit.java.facedetection;
 
 import android.graphics.Bitmap;
+import android.graphics.Paint;
 import android.hardware.Camera;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -31,6 +32,7 @@ import com.google.firebase.samples.apps.mlkit.common.GraphicOverlay;
 import com.google.firebase.samples.apps.mlkit.java.VisionProcessorBase;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -39,16 +41,20 @@ import java.util.List;
 public class FaceDetectionProcessor extends VisionProcessorBase<List<FirebaseVisionFace>> {
 
     private static final String TAG = "FaceDetectionProcessor";
+    private static final String HOST = "";
+    private static final int    PORT = 0;
 
     private final FirebaseVisionFaceDetector detector;
+    private final GrpcClient grpcClient = null;
 
     public FaceDetectionProcessor() {
         FirebaseVisionFaceDetectorOptions options =
                 new FirebaseVisionFaceDetectorOptions.Builder()
                         .setClassificationMode(FirebaseVisionFaceDetectorOptions.ALL_CLASSIFICATIONS)
                         .build();
-
         detector = FirebaseVision.getInstance().getVisionFaceDetector(options);
+
+        //grpcClient = new GrpcClient(HOST, PORT);
     }
 
     @Override
@@ -67,23 +73,46 @@ public class FaceDetectionProcessor extends VisionProcessorBase<List<FirebaseVis
 
     @Override
     protected void onSuccess(
-            @Nullable Bitmap originalCameraImage,
+            @Nullable Bitmap camBitmap,
             @NonNull List<FirebaseVisionFace> faces,
             @NonNull FrameMetadata frameMetadata,
             @NonNull GraphicOverlay graphicOverlay) {
         graphicOverlay.clear();
-        if (originalCameraImage != null) {
-            CameraImageGraphic imageGraphic = new CameraImageGraphic(graphicOverlay, originalCameraImage);
+
+        //[KBK:KBK] Add zoom here to make front cam full screen?
+        if (camBitmap != null) {
+            CameraImageGraphic imageGraphic = new CameraImageGraphic(graphicOverlay, camBitmap);
             graphicOverlay.add(imageGraphic);
         }
+
+        ArrayList<Bitmap> croppedBmps = new ArrayList<Bitmap>();
+
         for (int i = 0; i < faces.size(); ++i) {
             FirebaseVisionFace face = faces.get(i);
 
+            if (camBitmap != null) {
+                int cropX = (camBitmap.getWidth() - face.getBoundingBox().centerX()) - (face.getBoundingBox().width()/2) < 0 ?
+                    0: (camBitmap.getWidth() - face.getBoundingBox().centerX()) - (face.getBoundingBox().width()/2);
+                int cropY = face.getBoundingBox().centerY() - (face.getBoundingBox().height()/2) < 0 ?
+                    0: face.getBoundingBox().centerY() - (face.getBoundingBox().height()/2);
+                int cropWidth = cropX + face.getBoundingBox().width() > camBitmap.getWidth()-1 ?
+                    camBitmap.getWidth() - cropX: face.getBoundingBox().width();
+                int cropHeight = cropY + face.getBoundingBox().height() > camBitmap.getHeight()-1 ?
+                    camBitmap.getHeight() - cropY: face.getBoundingBox().height();
+
+                croppedBmps.add(Bitmap.createBitmap(camBitmap, cropX, cropY, cropWidth, cropHeight));
+            }
+
+            Bitmap firstCroppedImage = null;
+            if (croppedBmps.size() != 0) {
+                firstCroppedImage = croppedBmps.get(0);
+            }
             int cameraFacing =
-                    frameMetadata != null ? frameMetadata.getCameraFacing() :
-                            Camera.CameraInfo.CAMERA_FACING_BACK;
-            FaceGraphic faceGraphic = new FaceGraphic(graphicOverlay, face, cameraFacing);
+                frameMetadata != null ? frameMetadata.getCameraFacing() :
+                    Camera.CameraInfo.CAMERA_FACING_BACK;
+            FaceGraphic faceGraphic = new FaceGraphic(graphicOverlay, face, cameraFacing, firstCroppedImage);
             graphicOverlay.add(faceGraphic);
+
         }
         graphicOverlay.postInvalidate();
     }
